@@ -89,6 +89,26 @@ router.patch("/:id/rating", async (req, res) => {
   }
 });
 
+// PATCH update comment
+router.patch("/:id/comment", async (req, res) => {
+  try {
+    const { comment } = req.body;
+
+    const [result] = await db.query(
+      "UPDATE movies SET comment=? WHERE id=?",
+      [comment, req.params.id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Movie not found" });
+    }
+
+    res.json({ message: "Comment updated" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE movie
 router.delete("/:id", async (req, res) => {
   try {
