@@ -30,6 +30,52 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// GET comments by movie id
+router.get("/:id/comments", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      "SELECT * FROM movie_comments WHERE movie_id = ? ORDER BY id ASC",
+      [req.params.id]
+    );
+
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST create new comment
+router.post("/:id/comments", async (req, res) => {
+  try {
+    const { comment } = req.body;
+
+    if (!comment || comment.trim() === "") {
+      return res.status(400).json({ message: "Comment is required" });
+    }
+
+    const [countRows] = await db.query(
+      "SELECT COUNT(*) AS total FROM movie_comments WHERE movie_id = ?",
+      [req.params.id]
+    );
+
+    const nextUserNumber = countRows[0].total + 1;
+    const username = `Anonymous User ${nextUserNumber}`;
+
+    const [result] = await db.query(
+      "INSERT INTO movie_comments (movie_id, username, comment) VALUES (?, ?, ?)",
+      [req.params.id, username, comment]
+    );
+
+    res.status(201).json({
+      message: "Comment added",
+      id: result.insertId,
+      username: username
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // POST create movie
 router.post("/", async (req, res) => {
   try {
@@ -84,26 +130,6 @@ router.patch("/:id/rating", async (req, res) => {
     }
 
     res.json({ message: "Rating updated" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// PATCH update comment
-router.patch("/:id/comment", async (req, res) => {
-  try {
-    const { comment } = req.body;
-
-    const [result] = await db.query(
-      "UPDATE movies SET comment=? WHERE id=?",
-      [comment, req.params.id]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Movie not found" });
-    }
-
-    res.json({ message: "Comment updated" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
