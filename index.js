@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const movieRoutes = require("./api/movies");
+const authRoutes = require("./api/auth");
 
 const app = express();
 
@@ -12,6 +13,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/movies", movieRoutes);
+
+app.use("/api/auth", authRoutes); 
 
 const PORT = 3333;
 
