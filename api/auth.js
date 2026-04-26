@@ -100,26 +100,17 @@ router.get("/profile", verifyToken, async (req, res) => {
 });
 
 // UPDATE PROFILE
-router.put("/profile", async (req, res) => {
+router.put("/profile", verifyToken, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
+    const { name, profile_image } = req.body;
 
-    if (!authHeader) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const { name, avatar } = req.body;
-
-    if (!name || !avatar) {
-      return res.status(400).json({ message: "Name and avatar are required" });
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
     }
 
     const [result] = await db.query(
-      "UPDATE users SET name = ?, avatar = ? WHERE id = ?",
-      [name, avatar, decoded.id]
+      "UPDATE users SET name = ?, profile_image = ? WHERE id = ?",
+      [name, profile_image, req.user.id]
     );
 
     if (result.affectedRows === 0) {
@@ -128,7 +119,7 @@ router.put("/profile", async (req, res) => {
 
     res.json({ message: "Profile updated successfully" });
   } catch (error) {
-    res.status(401).json({ message: "Invalid or expired token" });
+    res.status(500).json({ error: error.message });
   }
 });
 
