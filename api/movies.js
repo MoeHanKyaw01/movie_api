@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const verifyToken = require("./authMiddleware");
 
 // GET all movies
 router.get("/", async (req, res) => {
@@ -31,7 +32,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST create movie
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
   try {
     const { title, genre, description, image_url, rating, likes } = req.body;
 
@@ -50,7 +51,7 @@ router.post("/", async (req, res) => {
 });
 
 // PUT update movie
-router.put("/:id", async (req, res) => {
+router.put("/:id", verifyToken, async (req, res) => {
   try {
     const { title, genre, description, image_url, rating, likes } = req.body;
 
@@ -70,7 +71,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE movie
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const [result] = await db.query(
       "DELETE FROM movies WHERE id = ?",
@@ -128,7 +129,7 @@ router.get("/:id/comments", async (req, res) => {
 });
 
 // POST add comment for a movie
-router.post("/:id/comments", async (req, res) => {
+router.post("/:id/comments", verifyToken, async (req, res) => {
   try {
     const { comment } = req.body;
 
@@ -145,13 +146,14 @@ router.post("/:id/comments", async (req, res) => {
       return res.status(404).json({ message: "Movie not found" });
     }
 
-    const [countRows] = await db.query(
-      "SELECT COUNT(*) AS total FROM movie_comments WHERE movie_id = ?",
-      [req.params.id]
+    // get logged-in user's name
+    const [userRows] = await db.query(
+      "SELECT name, username FROM users WHERE id = ?",
+      [req.user.id]
     );
 
-    const nextUserNumber = countRows[0].total + 1;
-    const username = `Anonymous User ${nextUserNumber}`;
+    const username =
+      userRows.length > 0 ? userRows[0].name : `User ${req.user.id}`;
 
     const [result] = await db.query(
       "INSERT INTO movie_comments (movie_id, username, comment) VALUES (?, ?, ?)",

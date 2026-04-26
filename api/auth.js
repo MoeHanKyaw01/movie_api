@@ -3,38 +3,28 @@ const router = express.Router();
 const db = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const verifyToken = require("./authMiddleware");
 
 // REGISTER new user
 router.post("/register", async (req, res) => {
   try {
-    const { name, username, password, avatar } = req.body;
+    const { name, username, password, profile_image } = req.body;
 
     if (!name || !username || !password) {
-      return res.status(400).json({ message: "Name, username, and password are required" });
-    }
-
-    const [existingUser] = await db.query(
-      "SELECT * FROM users WHERE username = ?",
-      [username]
-    );
-
-    if (existingUser.length > 0) {
-      return res.status(409).json({ message: "Username already exists" });
+      return res.status(400).json({
+        message: "Name, username and password required",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const defaultAvatar =
-      avatar || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
-
-    const [result] = await db.query(
-      "INSERT INTO users (name, username, password, avatar) VALUES (?, ?, ?, ?)",
-      [name, username, hashedPassword, defaultAvatar]
+    await db.query(
+      "INSERT INTO users (name, username, password, profile_image) VALUES (?, ?, ?, ?)",
+      [name, username, hashedPassword, profile_image || null]
     );
 
     res.status(201).json({
       message: "User registered successfully",
-      userId: result.insertId,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -92,21 +82,11 @@ router.post("/login", async (req, res) => {
 });
 
 // PROFILE using token
-router.get("/profile", async (req, res) => {
+router.get("/profile", verifyToken, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader) {
-      return res.status(401).json({ message: "No token provided" });
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const [users] = await db.query(
-      "SELECT id, name, username, avatar, created_at FROM users WHERE id = ?",
-      [decoded.id]
+      "SELECT id, name, username, profile_image, created_at FROM users WHERE id = ?",
+      [req.user.id]
     );
 
     if (users.length === 0) {
@@ -115,7 +95,57 @@ router.get("/profile", async (req, res) => {
 
     res.json(users[0]);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// UPDATE PROFILE
+router.put("/profile", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({ message: "No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const { name, avatar } = req.body;
+
+    if (!name || !avatar) {
+      return res.status(400).json({ message: "Name and avatar are required" });
+    }
+
+    const [result] = await db.query(
+      "UPDATE users SET name = ?, avatar = ? WHERE id = ?",
+      [name, avatar, decoded.id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "Profile updated successfully" });
+  } catch (error) {
     res.status(401).json({ message: "Invalid or expired token" });
+  }
+});
+
+router.put("/update-profile", verifyToken, async (req, res) => {
+  try {
+    const { name, username, profile_image } = req.body;
+
+    await db.query(
+      "UPDATE users SET name = ?, username = ?, profile_image = ? WHERE id = ?",
+      [name, username, profile_image, req.user.id]
+    );
+
+    res.json({
+      message: "Profile updated successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
